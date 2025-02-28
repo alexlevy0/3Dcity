@@ -43,6 +43,19 @@ export class City {
                 emissiveIntensity: 1
             }),
             bench: new THREE.MeshLambertMaterial({ color: 0x553311 }),
+            // Matériaux pour les fenêtres
+            glassWindow: new THREE.MeshLambertMaterial({ 
+                color: 0x88CCFF, 
+                transparent: true, 
+                opacity: 0.7 
+            }),
+            windowLit: new THREE.MeshStandardMaterial({
+                color: 0xFFEE88,
+                emissive: 0xFFEE88,
+                emissiveIntensity: 0.6,
+                transparent: true,
+                opacity: 0.9
+            })
         };
         
         // Create advanced buildings system
@@ -62,6 +75,9 @@ export class City {
         
         // Track special landmark positions to avoid placing other buildings there
         this.landmarkPositions = [];
+        
+        // Fenêtres éclairées pour le cycle jour/nuit
+        this.windowLights = [];
     }
     
     async initialize() {
@@ -378,6 +394,20 @@ export class City {
         this.scene.add(building);
         this.buildings.push(building);
         
+        // Ajouter des fenêtres au gratte-ciel
+        const floorCount = Math.floor(height / 4); // Environ 4 mètres par étage
+        this.createWindowGrid(
+            building,
+            width,
+            height,
+            depth,
+            floorCount, // rangées basées sur le nombre d'étages
+            Math.ceil(width / 5), // colonnes basées sur la largeur (environ 5m par fenêtre)
+            baseX,
+            height / 2,
+            baseZ
+        );
+        
         // Add details like setbacks or antennas
         if (Math.random() < 0.5) {
             // Add a smaller section on top
@@ -396,6 +426,22 @@ export class City {
             top.castShadow = true;
             this.scene.add(top);
             this.buildings.push(top);
+            
+            // Ajouter des fenêtres à la section supérieure
+            const topFloorCount = Math.floor(topHeight / 4);
+            if (topFloorCount > 0) {
+                this.createWindowGrid(
+                    top,
+                    topWidth,
+                    topHeight,
+                    topDepth,
+                    topFloorCount,
+                    Math.ceil(topWidth / 5),
+                    baseX,
+                    height + topHeight / 2,
+                    baseZ
+                );
+            }
             
             // Add an antenna
             const antennaGeometry = new THREE.CylinderGeometry(0.5, 0.5, 15, 8);
@@ -453,6 +499,22 @@ export class City {
                 this.scene.add(building);
                 this.buildings.push(building);
                 
+                // Ajouter des fenêtres au bâtiment commercial
+                const floorCount = Math.floor(height / 3.5); // Environ 3.5 mètres par étage pour les commerciaux
+                if (floorCount > 0) {
+                    this.createWindowGrid(
+                        building,
+                        width,
+                        height,
+                        depth,
+                        floorCount,
+                        Math.ceil(width / 4),
+                        baseX + offsetX,
+                        height / 2,
+                        baseZ + offsetZ
+                    );
+                }
+                
                 buildingIndex++;
             }
         }
@@ -505,6 +567,22 @@ export class City {
                 building.receiveShadow = true;
                 this.scene.add(building);
                 this.buildings.push(building);
+                
+                // Ajouter des fenêtres au bâtiment résidentiel
+                const floorCount = Math.floor(height / 3); // Environ 3 mètres par étage pour les résidentiels
+                if (floorCount > 0) {
+                    this.createWindowGrid(
+                        building,
+                        width,
+                        height,
+                        depth,
+                        floorCount,
+                        Math.ceil(width / 3), // Fenêtres plus larges pour les bâtiments résidentiels
+                        baseX + offsetX,
+                        height / 2,
+                        baseZ + offsetZ
+                    );
+                }
                 
                 buildingIndex++;
             }
@@ -796,5 +874,90 @@ export class City {
     updateDayNightCycle(isDaytime) {
         // Update advanced building window lights based on time of day
         this.advancedBuildings.updateWindowLights(isDaytime);
+        
+        // Mettre à jour les fenêtres des bâtiments standards
+        this.updateWindowLights(isDaytime);
+    }
+    
+    // Méthode pour créer une grille de fenêtres sur un bâtiment
+    createWindowGrid(
+        building,
+        buildingWidth, 
+        buildingHeight, 
+        buildingDepth, 
+        rows,
+        columns,
+        xOffset,
+        yOffset,
+        zOffset
+    ) {
+        const windowWidth = (buildingWidth / columns) * 0.6; // Proportion de 60%
+        const windowHeight = (buildingHeight / rows) * 0.6; // Proportion de 60%
+        const windowGeometry = new THREE.PlaneGeometry(windowWidth, windowHeight);
+        
+        // Léger décalage pour éviter le z-fighting
+        const offset = 0.05;
+        
+        // Fonction pour créer les fenêtres sur une face
+        const createWindowsOnFace = (isXFace, sign) => {
+            for (let row = 0; row < rows; row++) {
+                for (let col = 0; col < columns; col++) {
+                    // Décider aléatoirement si la fenêtre est allumée ou éteinte
+                    const isLit = Math.random() < 0.3;
+                    const windowMaterial = isLit ? 
+                        this.materials.windowLit : 
+                        this.materials.glassWindow;
+                    
+                    const window = new THREE.Mesh(windowGeometry, windowMaterial);
+                    
+                    // Calculs de position
+                    const colOffset = (col - (columns - 1) / 2) * (buildingWidth / columns);
+                    const rowOffset = (row - (rows - 1) / 2) * (buildingHeight / rows);
+                    
+                    if (isXFace) {
+                        // Face avant ou arrière
+                        window.position.set(
+                            colOffset + xOffset,
+                            rowOffset + yOffset,
+                            (sign * buildingDepth / 2) + (sign * offset) + zOffset
+                        );
+                        // Les faces avant/arrière n'ont pas besoin de rotation
+                    } else {
+                        // Faces latérales
+                        window.position.set(
+                            (sign * buildingWidth / 2) + (sign * offset) + xOffset,
+                            rowOffset + yOffset,
+                            colOffset + zOffset
+                        );
+                        window.rotation.y = Math.PI / 2; // Rotation pour faire face vers l'extérieur
+                    }
+                    
+                    this.scene.add(window);
+                    
+                    // Tracker les fenêtres éclairées pour les changements jour/nuit
+                    if (isLit) {
+                        this.windowLights.push({
+                            mesh: window,
+                            intensity: 0.4 + Math.random() * 0.6  // Intensité aléatoire
+                        });
+                    }
+                }
+            }
+        };
+        
+        // Créer des fenêtres sur chaque face
+        createWindowsOnFace(true, 1);  // Face avant (Z positif)
+        createWindowsOnFace(true, -1); // Face arrière (Z négatif)
+        createWindowsOnFace(false, 1); // Face droite (X positif)
+        createWindowsOnFace(false, -1); // Face gauche (X négatif)
+    }
+    
+    // Méthode pour mettre à jour les fenêtres selon le cycle jour/nuit
+    updateWindowLights(isDaytime) {
+        this.windowLights.forEach(windowLight => {
+            // Fenêtres allumées la nuit, éteintes le jour
+            windowLight.mesh.material.emissiveIntensity = 
+                isDaytime ? 0 : windowLight.intensity;
+        });
     }
 } 
