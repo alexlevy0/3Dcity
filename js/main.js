@@ -17,7 +17,8 @@ camera.position.set(0, 30, 100);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(window.devicePixelRatio);
-renderer.shadowMap.enabled = false;
+renderer.shadowMap.enabled = true;
+renderer.shadowMap.type = THREE.PCFSoftShadowMap;
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1;
 renderer.physicallyCorrectLights = false;
@@ -26,11 +27,11 @@ document.body.appendChild(renderer.domElement);
 // Controls initialization
 const controls = new CameraControls(camera, renderer.domElement);
 
-// Light initialization
-const dayNightCycle = new DayNightCycle(scene);
-
-// Create city
+// Create city first
 const city = new City(scene);
+
+// Light initialization - pass city reference for building lights
+const dayNightCycle = new DayNightCycle(scene, city);
 
 // Create traffic system
 const traffic = new Traffic(scene, city.roadNetwork);
@@ -68,6 +69,37 @@ init();
 const timeSlider = document.getElementById('time-slider');
 const timeDisplay = document.getElementById('time-display');
 
+// Enhanced time controls - add automatic time progression
+const timeControlDiv = document.getElementById('time-control');
+const timeAutoBtn = document.createElement('button');
+timeAutoBtn.textContent = 'Auto Time';
+timeAutoBtn.style.marginLeft = '10px';
+timeAutoBtn.addEventListener('click', () => {
+    const isAuto = dayNightCycle.toggleTimeProgression();
+    timeAutoBtn.textContent = isAuto ? 'Stop Time' : 'Auto Time';
+    timeSlider.disabled = isAuto;
+});
+timeControlDiv.appendChild(timeAutoBtn);
+
+// Speed control for time progression
+const speedControl = document.createElement('div');
+speedControl.style.marginTop = '10px';
+speedControl.innerHTML = `
+    <label for="speed-slider">Time Speed: </label>
+    <input type="range" id="speed-slider" min="0.01" max="1" value="0.1" step="0.01">
+    <span id="speed-display">0.10</span>
+`;
+timeControlDiv.appendChild(speedControl);
+
+const speedSlider = document.getElementById('speed-slider');
+const speedDisplay = document.getElementById('speed-display');
+
+speedSlider.addEventListener('input', (event) => {
+    const speed = parseFloat(event.target.value);
+    dayNightCycle.setTimeProgressionSpeed(speed);
+    speedDisplay.textContent = speed.toFixed(2);
+});
+
 timeSlider.addEventListener('input', (event) => {
     const time = parseFloat(event.target.value);
     dayNightCycle.setTime(time);
@@ -77,6 +109,27 @@ timeSlider.addEventListener('input', (event) => {
     const minutes = Math.floor((time - hours) * 60);
     timeDisplay.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
 });
+
+// Weather controls
+const weatherControlDiv = document.createElement('div');
+weatherControlDiv.id = 'weather-control';
+weatherControlDiv.style.position = 'absolute';
+weatherControlDiv.style.bottom = '50px';
+weatherControlDiv.style.right = '10px';
+weatherControlDiv.style.background = 'rgba(0, 0, 0, 0.5)';
+weatherControlDiv.style.color = 'white';
+weatherControlDiv.style.padding = '10px';
+weatherControlDiv.style.fontFamily = 'Arial, sans-serif';
+weatherControlDiv.style.fontSize = '14px';
+weatherControlDiv.style.borderRadius = '5px';
+weatherControlDiv.innerHTML = `
+    <div style="margin-bottom: 5px">Weather</div>
+    <button id="weather-clear">Clear</button>
+    <button id="weather-cloudy">Cloudy</button>
+    <button id="weather-rain">Rain</button>
+    <button id="weather-fog">Fog</button>
+`;
+document.body.appendChild(weatherControlDiv);
 
 // Handle window resize
 window.addEventListener('resize', () => {

@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { MeshStandardMaterial } from 'three';
+import { AdvancedBuildings } from './AdvancedBuildings.js';
 
 export class City {
     constructor(scene) {
@@ -44,14 +45,35 @@ export class City {
             bench: new THREE.MeshLambertMaterial({ color: 0x553311 }),
         };
         
+        // Create advanced buildings system
+        this.advancedBuildings = new AdvancedBuildings(scene, this.materials);
+        
         // Add debug flag
         this.debugMode = true;
+        
+        // Landmark buildings for special placement
+        this.landmarkBuildings = {
+            cityHall: null,
+            museum: null,
+            trainStation: null,
+            artDecoSkyscraper: null,
+            modernSkyscraper: null
+        };
+        
+        // Track special landmark positions to avoid placing other buildings there
+        this.landmarkPositions = [];
     }
     
     async initialize() {
         this.createGround();
         this.createGridSystem();
+        
+        // Create landmark buildings in specific locations
+        this.createLandmarkBuildings();
+        
+        // Create other regular buildings
         this.createBuildings();
+        
         this.createStreetElements();
         
         // Call debug method if in debug mode
@@ -274,21 +296,62 @@ export class City {
         const baseX = blockX * (this.blockSize + this.roadWidth);
         const baseZ = blockZ * (this.blockSize + this.roadWidth);
         
-        // Determine block type (random)
-        const blockType = Math.random();
+        // Check if this position is reserved for a landmark building
+        const isLandmarkPosition = this.landmarkPositions.some(pos => 
+            Math.abs(pos.x - baseX) < 1 && Math.abs(pos.z - baseZ) < 1
+        );
         
-        if (blockType < 0.2) {
-            // Skyscraper district (one large building)
-            this.createSkyscraper(baseX, baseZ);
-        } else if (blockType < 0.5) {
-            // Commercial district (medium buildings)
-            this.createCommercialBuildings(baseX, baseZ);
-        } else if (blockType < 0.8) {
-            // Residential district (small buildings)
-            this.createResidentialBuildings(baseX, baseZ);
+        if (isLandmarkPosition) {
+            // Skip this block, as it's used for landmarks
+            return;
+        }
+        
+        // Determine city zones based on distance from center
+        const distanceFromCenter = Math.sqrt(blockX * blockX + blockZ * blockZ);
+        
+        // Determine block type based on location and random factors
+        let blockType;
+        
+        if (distanceFromCenter < 3) {
+            // Downtown / central business district - more skyscrapers
+            blockType = Math.random() < 0.7 ? 'skyscraper' : 
+                       (Math.random() < 0.5 ? 'commercial' : 'park');
+        } else if (distanceFromCenter < 5) {
+            // Midtown area - mix of commercial and residential
+            blockType = Math.random() < 0.3 ? 'skyscraper' : 
+                       (Math.random() < 0.6 ? 'commercial' : 'residential');
         } else {
-            // Park or plaza
-            this.createPark(baseX, baseZ);
+            // Outer areas - mostly residential with some commercial
+            blockType = Math.random() < 0.1 ? 'skyscraper' : 
+                       (Math.random() < 0.3 ? 'commercial' : 
+                       (Math.random() < 0.8 ? 'residential' : 'park'));
+        }
+        
+        // Create buildings based on block type
+        switch (blockType) {
+            case 'skyscraper':
+                // Mix of classic and advanced skyscrapers
+                if (Math.random() < 0.3) {
+                    // Use one of the advanced skyscrapers
+                    if (Math.random() < 0.5) {
+                        this.advancedBuildings.createArtDecoSkyscraper(baseX, baseZ);
+                    } else {
+                        this.advancedBuildings.createModernSkyscraper(baseX, baseZ);
+                    }
+                } else {
+                    // Use the original skyscraper
+                    this.createSkyscraper(baseX, baseZ);
+                }
+                break;
+            case 'commercial':
+                this.createCommercialBuildings(baseX, baseZ);
+                break;
+            case 'residential':
+                this.createResidentialBuildings(baseX, baseZ);
+                break;
+            case 'park':
+                this.createPark(baseX, baseZ);
+                break;
         }
     }
     
@@ -693,5 +756,45 @@ export class City {
             objects: totalObjects + buildings,
             lights: lampLights + trafficLightLamps
         };
+    }
+    
+    createLandmarkBuildings() {
+        // Calculate the number of blocks that fit in the city
+        const blockCount = Math.floor(this.citySize / (this.blockSize + this.roadWidth));
+        
+        // Place City Hall near the center
+        const cityHallX = 0;
+        const cityHallZ = 0;
+        this.landmarkBuildings.cityHall = this.advancedBuildings.createCityHall(cityHallX, cityHallZ);
+        this.landmarkPositions.push({x: cityHallX, z: cityHallZ});
+        
+        // Place Museum a bit to the east
+        const museumX = 2 * (this.blockSize + this.roadWidth);
+        const museumZ = -1 * (this.blockSize + this.roadWidth);
+        this.landmarkBuildings.museum = this.advancedBuildings.createMuseum(museumX, museumZ);
+        this.landmarkPositions.push({x: museumX, z: museumZ});
+        
+        // Place Train Station to the north
+        const stationX = -2 * (this.blockSize + this.roadWidth);
+        const stationZ = 3 * (this.blockSize + this.roadWidth);
+        this.landmarkBuildings.trainStation = this.advancedBuildings.createTrainStation(stationX, stationZ);
+        this.landmarkPositions.push({x: stationX, z: stationZ});
+        
+        // Place Art Deco Skyscraper in business district
+        const artDecoX = 3 * (this.blockSize + this.roadWidth);
+        const artDecoZ = 2 * (this.blockSize + this.roadWidth);
+        this.landmarkBuildings.artDecoSkyscraper = this.advancedBuildings.createArtDecoSkyscraper(artDecoX, artDecoZ);
+        this.landmarkPositions.push({x: artDecoX, z: artDecoZ});
+        
+        // Place Modern Skyscraper in business district
+        const modernX = 2 * (this.blockSize + this.roadWidth);
+        const modernZ = 3 * (this.blockSize + this.roadWidth);
+        this.landmarkBuildings.modernSkyscraper = this.advancedBuildings.createModernSkyscraper(modernX, modernZ);
+        this.landmarkPositions.push({x: modernX, z: modernZ});
+    }
+    
+    updateDayNightCycle(isDaytime) {
+        // Update advanced building window lights based on time of day
+        this.advancedBuildings.updateWindowLights(isDaytime);
     }
 } 
