@@ -704,6 +704,8 @@ export class City {
         const base = new THREE.Mesh(baseGeometry, this.materials.lamp);
         base.position.set(x, 0.15, z);
         base.castShadow = true;
+        base.userData.type = 'lampPost';
+        base.name = 'lampPost_base';
         this.scene.add(base);
         
         // Create lamp post pole
@@ -711,6 +713,8 @@ export class City {
         const pole = new THREE.Mesh(poleGeometry, this.materials.lamp);
         pole.position.set(x, 4, z);
         pole.castShadow = true;
+        pole.userData.type = 'lampPost';
+        pole.name = 'lampPost_pole';
         this.scene.add(pole);
         
         // Create lamp head
@@ -718,12 +722,16 @@ export class City {
         const head = new THREE.Mesh(headGeometry, this.materials.lamp);
         head.position.set(x, 8, z);
         head.castShadow = true;
+        head.userData.type = 'lampPost';
+        head.name = 'lampPost_head';
         this.scene.add(head);
         
         // Create light bulb - ONLY EMISSIVE MATERIAL, NO ACTUAL LIGHT
         const bulbGeometry = new THREE.SphereGeometry(0.4, 16, 16);
         const bulb = new THREE.Mesh(bulbGeometry, this.materials.lampLight);
         bulb.position.set(x, 7.7, z);
+        bulb.userData.type = 'lampPost';
+        bulb.name = 'lampPost_bulb';
         this.scene.add(bulb);
         
         // Store the lamp for the day/night cycle - with null light
@@ -743,11 +751,13 @@ export class City {
         seat.position.set(x, 1, z);
         seat.rotation.y = rotation;
         seat.castShadow = true;
+        seat.userData.type = 'bench';
+        seat.name = 'bench_seat';
         this.scene.add(seat);
         
         // Create bench legs
         const positions = [-2, 0, 2];
-        positions.forEach(pos => {
+        positions.forEach((pos, index) => {
             const legGeometry = new THREE.BoxGeometry(0.3, 1, 1.5);
             const leg = new THREE.Mesh(legGeometry, this.materials.bench);
             
@@ -758,6 +768,8 @@ export class City {
             leg.position.set(legX, 0.5, legZ);
             leg.rotation.y = rotation;
             leg.castShadow = true;
+            leg.userData.type = 'bench';
+            leg.name = `bench_leg_${index}`;
             this.scene.add(leg);
             
             this.streetElements.push(leg);
@@ -774,8 +786,11 @@ export class City {
         backrest.position.set(backX, 1.9, backZ);
         backrest.rotation.y = rotation;
         backrest.castShadow = true;
+        backrest.userData.type = 'bench';
+        backrest.name = 'bench_backrest';
         this.scene.add(backrest);
         
+        // Add seat and backrest to streetElements
         this.streetElements.push(seat, backrest);
     }
     
@@ -917,22 +932,29 @@ export class City {
                     if (isXFace) {
                         // Face avant ou arrière
                         window.position.set(
-                            colOffset + xOffset,
-                            rowOffset + yOffset,
-                            (sign * buildingDepth / 2) + (sign * offset) + zOffset
+                            colOffset,
+                            rowOffset,
+                            (sign * buildingDepth / 2) + (sign * offset)
                         );
                         // Les faces avant/arrière n'ont pas besoin de rotation
                     } else {
                         // Faces latérales
                         window.position.set(
-                            (sign * buildingWidth / 2) + (sign * offset) + xOffset,
-                            rowOffset + yOffset,
-                            colOffset + zOffset
+                            (sign * buildingWidth / 2) + (sign * offset),
+                            rowOffset,
+                            colOffset
                         );
                         window.rotation.y = Math.PI / 2; // Rotation pour faire face vers l'extérieur
                     }
                     
-                    this.scene.add(window);
+                    // Créer un groupe pour le bâtiment s'il n'en a pas déjà un
+                    if (!building.windowGroup) {
+                        building.windowGroup = new THREE.Group();
+                        building.windowGroup.position.set(xOffset, yOffset, zOffset);
+                        this.scene.add(building.windowGroup);
+                    }
+                    
+                    building.windowGroup.add(window);
                     
                     // Tracker les fenêtres éclairées pour les changements jour/nuit
                     if (isLit) {
@@ -946,9 +968,9 @@ export class City {
         };
         
         // Créer des fenêtres sur chaque face
-        createWindowsOnFace(true, 1);  // Face avant (Z positif)
-        createWindowsOnFace(true, -1); // Face arrière (Z négatif)
-        createWindowsOnFace(false, 1); // Face droite (X positif)
+        createWindowsOnFace(true, 1);   // Face avant (Z positif)
+        createWindowsOnFace(true, -1);  // Face arrière (Z négatif)
+        createWindowsOnFace(false, 1);  // Face droite (X positif)
         createWindowsOnFace(false, -1); // Face gauche (X négatif)
     }
     

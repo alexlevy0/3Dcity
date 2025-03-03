@@ -77,6 +77,11 @@ export class RaceGame {
         // Create player vehicle
         this.player = new PlayerVehicle(this.scene);
         
+        // Pass all city elements for collision detection
+        this.scene.buildings = this.city.buildings;
+        this.scene.streetElements = this.city.streetElements;
+        this.scene.vehicles = this.scene.vehicles || []; // If there are other vehicles in the scene
+        
         // Create checkpoints around the city
         this.createCheckpoints();
         
