@@ -6,7 +6,7 @@ export class CameraControls {
     constructor(camera, domElement) {
         this.camera = camera;
         this.domElement = domElement;
-        this.moveSpeed = 50; // Units per second
+        this.moveSpeed = 150; // Increased from 50 to 150 units per second to navigate the larger city faster
         
         // Set up orbit controls for third-person view
         this.orbitControls = new OrbitControls(camera, domElement);
@@ -14,7 +14,7 @@ export class CameraControls {
         this.orbitControls.dampingFactor = 0.05;
         this.orbitControls.screenSpacePanning = false;
         this.orbitControls.minDistance = 10;
-        this.orbitControls.maxDistance = 500;
+        this.orbitControls.maxDistance = 1500;
         this.orbitControls.maxPolarAngle = Math.PI / 2 - 0.1; // Prevent going below ground
         
         // Set up pointer lock controls for first-person view

@@ -19,10 +19,10 @@ export class DayNightCycle {
         this.sunLight.shadow.mapSize.width = 2048;
         this.sunLight.shadow.mapSize.height = 2048;
         this.sunLight.shadow.camera.near = 0.5;
-        this.sunLight.shadow.camera.far = 500;
+        this.sunLight.shadow.camera.far = 1500;
         
         // Adjust shadow camera size to fit the entire city
-        const d = 200;
+        const d = 600;
         this.sunLight.shadow.camera.left = -d;
         this.sunLight.shadow.camera.right = d;
         this.sunLight.shadow.camera.top = d;

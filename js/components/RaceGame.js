@@ -92,11 +92,11 @@ export class RaceGame {
     createCheckpoints() {
         // Create checkpoint markers at strategic points around the city
         const checkpointPositions = [
-            { x: 0, z: 0 },        // Start/Finish
-            { x: 100, z: 100 },    // Checkpoint 1
-            { x: -100, z: 100 },   // Checkpoint 2
-            { x: -100, z: -100 },  // Checkpoint 3
-            { x: 100, z: -100 }    // Checkpoint 4
+            { x: 0, z: 0 },            // Start/Finish
+            { x: 300, z: 300 },        // Checkpoint 1 (increased from 100 to 300)
+            { x: -300, z: 300 },       // Checkpoint 2 (increased from -100 to -300)
+            { x: -300, z: -300 },      // Checkpoint 3 (increased from -100 to -300)
+            { x: 300, z: -300 }        // Checkpoint 4 (increased from 100 to 300)
         ];
         
         checkpointPositions.forEach((pos, index) => {

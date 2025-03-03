@@ -8,10 +8,11 @@ import { Traffic } from './components/Traffic.js';
 import { Pedestrians } from './components/Pedestrians.js';
 import { DayNightCycle } from './components/DayNightCycle.js';
 import { RaceGame } from './components/RaceGame.js';
+import { LevelOfDetail } from './components/LevelOfDetail.js';
 
 // Scene setup
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
+const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 5000);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -25,6 +26,10 @@ document.body.appendChild(renderer.domElement);
 
 // Create city first
 const city = new City(scene);
+
+// Create LOD system after city but before other systems
+const lod = new LevelOfDetail(scene, city, camera);
+city.lod = lod; // Add reference to the city
 
 // Light initialization - pass city reference for building lights
 const dayNightCycle = new DayNightCycle(scene, city);
@@ -74,6 +79,20 @@ const cameraOffset = new THREE.Vector3(0, 5, -15);
 const cameraLookOffset = new THREE.Vector3(0, 0, 10);
 const cameraSmoothness = 0.1;
 
+// Add LOD view distance control
+const viewDistanceSlider = document.getElementById('view-distance');
+const distanceDisplay = document.getElementById('distance-display');
+
+viewDistanceSlider.addEventListener('input', () => {
+    const value = parseInt(viewDistanceSlider.value);
+    distanceDisplay.textContent = value.toString();
+    
+    // Update LOD view distance
+    if (lod) {
+        lod.viewDistance = value;
+    }
+});
+
 // Animation loop
 function animate() {
     requestAnimationFrame(animate);
@@ -84,6 +103,9 @@ function animate() {
     traffic.update(delta);
     pedestrians.update(delta);
     dayNightCycle.update(delta);
+    
+    // Update LOD system to load/unload buildings
+    lod.update(delta);
     
     if (raceGame) {
         raceGame.update(delta);
@@ -306,4 +328,51 @@ function debugUniformCount() {
 if (!window.debugRan) {
     debugUniformCount();
     window.debugRan = true;
+}
+
+// Debugging functions
+// Add a debug display for LOD system
+const debugInfo = document.createElement('div');
+debugInfo.id = 'debug-info';
+debugInfo.style.position = 'absolute';
+debugInfo.style.top = '50px';
+debugInfo.style.right = '10px';
+debugInfo.style.background = 'rgba(0, 0, 0, 0.5)';
+debugInfo.style.color = 'white';
+debugInfo.style.padding = '10px';
+debugInfo.style.fontFamily = 'Arial, sans-serif';
+debugInfo.style.fontSize = '12px';
+debugInfo.style.display = 'none'; // Hidden by default
+document.body.appendChild(debugInfo);
+
+// Toggle debug display with backtick key
+document.addEventListener('keydown', (event) => {
+    if (event.code === 'Backquote') {
+        const isVisible = debugInfo.style.display !== 'none';
+        debugInfo.style.display = isVisible ? 'none' : 'block';
+        
+        if (!isVisible) {
+            lod.debugStats();
+            updateDebugInfo();
+        }
+    }
+});
+
+function updateDebugInfo() {
+    if (debugInfo.style.display !== 'none') {
+        const stats = lod.stats;
+        debugInfo.innerHTML = `
+            <h3>LOD System</h3>
+            <p>Total blocks: ${stats.totalBlocks}</p>
+            <p>Active blocks: ${stats.activeBlocks} (${Math.round(stats.activeBlocks / stats.totalBlocks * 100)}%)</p>
+            <p>Total buildings: ${stats.totalBuildings}</p>
+            <p>Active buildings: ${stats.activeBuildings} (${Math.round(stats.activeBuildings / stats.totalBuildings * 100)}%)</p>
+            <p>Camera position: 
+                X: ${Math.round(camera.position.x)}, 
+                Y: ${Math.round(camera.position.y)}, 
+                Z: ${Math.round(camera.position.z)}
+            </p>
+        `;
+        setTimeout(updateDebugInfo, 500);
+    }
 } 
