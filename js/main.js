@@ -7,12 +7,11 @@ import { City } from './components/City.js';
 import { Traffic } from './components/Traffic.js';
 import { Pedestrians } from './components/Pedestrians.js';
 import { DayNightCycle } from './components/DayNightCycle.js';
-import { CameraControls } from './components/CameraControls.js';
+import { RaceGame } from './components/RaceGame.js';
 
 // Scene setup
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 2000);
-camera.position.set(0, 30, 100);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
@@ -24,20 +23,22 @@ renderer.toneMappingExposure = 1;
 renderer.physicallyCorrectLights = false;
 document.body.appendChild(renderer.domElement);
 
-// Controls initialization
-const controls = new CameraControls(camera, renderer.domElement);
-
 // Create city first
 const city = new City(scene);
 
 // Light initialization - pass city reference for building lights
 const dayNightCycle = new DayNightCycle(scene, city);
 
-// Create traffic system
+// Create traffic system with reduced traffic for better gameplay
 const traffic = new Traffic(scene, city.roadNetwork);
+traffic.vehicleCount = 10; // Reduce number of AI vehicles
 
-// Create pedestrian system
+// Create pedestrian system with reduced pedestrians
 const pedestrians = new Pedestrians(scene, city.sidewalks, city.crosswalks);
+pedestrians.pedestrianCount = 50; // Reduce number of pedestrians
+
+// Create race game
+let raceGame;
 
 // Loading indicator
 const loadingDiv = document.getElementById('info');
@@ -51,7 +52,10 @@ async function init() {
             pedestrians.initialize()
         ]);
         
-        loadingDiv.innerHTML = '3D City Scene<br>Loaded successfully!';
+        // Initialize race game after city is loaded
+        raceGame = new RaceGame(scene, city);
+        
+        loadingDiv.innerHTML = '3D City Racing<br>Press ENTER to start!';
         setTimeout(() => {
             loadingDiv.style.opacity = '0';
             setTimeout(() => loadingDiv.style.display = 'none', 1000);
@@ -65,50 +69,82 @@ async function init() {
 
 init();
 
-// Time control
-const timeSlider = document.getElementById('time-slider');
-const timeDisplay = document.getElementById('time-display');
+// Camera follow settings
+const cameraOffset = new THREE.Vector3(0, 5, -15);
+const cameraLookOffset = new THREE.Vector3(0, 0, 10);
+const cameraSmoothness = 0.1;
 
-// Enhanced time controls - add automatic time progression
-const timeControlDiv = document.getElementById('time-control');
-const timeAutoBtn = document.createElement('button');
-timeAutoBtn.textContent = 'Auto Time';
-timeAutoBtn.style.marginLeft = '10px';
-timeAutoBtn.addEventListener('click', () => {
-    const isAuto = dayNightCycle.toggleTimeProgression();
-    timeAutoBtn.textContent = isAuto ? 'Stop Time' : 'Auto Time';
-    timeSlider.disabled = isAuto;
-});
-timeControlDiv.appendChild(timeAutoBtn);
-
-// Speed control for time progression
-const speedControl = document.createElement('div');
-speedControl.style.marginTop = '10px';
-speedControl.innerHTML = `
-    <label for="speed-slider">Time Speed: </label>
-    <input type="range" id="speed-slider" min="0.01" max="1" value="0.1" step="0.01">
-    <span id="speed-display">0.10</span>
-`;
-timeControlDiv.appendChild(speedControl);
-
-const speedSlider = document.getElementById('speed-slider');
-const speedDisplay = document.getElementById('speed-display');
-
-speedSlider.addEventListener('input', (event) => {
-    const speed = parseFloat(event.target.value);
-    dayNightCycle.setTimeProgressionSpeed(speed);
-    speedDisplay.textContent = speed.toFixed(2);
-});
-
-timeSlider.addEventListener('input', (event) => {
-    const time = parseFloat(event.target.value);
-    dayNightCycle.setTime(time);
+// Animation loop
+function animate() {
+    requestAnimationFrame(animate);
     
-    // Update time display
-    const hours = Math.floor(time);
-    const minutes = Math.floor((time - hours) * 60);
-    timeDisplay.textContent = `${hours.toString().padStart(2, '0')}:${minutes.toString().padStart(2, '0')}`;
+    const delta = clock.getDelta();
+    
+    // Update game components
+    traffic.update(delta);
+    pedestrians.update(delta);
+    dayNightCycle.update(delta);
+    
+    if (raceGame) {
+        raceGame.update(delta);
+        
+        // Update camera to follow player vehicle
+        if (raceGame.player) {
+            // Calculate desired camera position
+            const targetPosition = raceGame.player.position.clone();
+            const targetRotation = raceGame.player.rotation;
+            
+            // Calculate camera offset based on car's rotation
+            const rotatedOffset = cameraOffset.clone();
+            rotatedOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), targetRotation);
+            targetPosition.add(rotatedOffset);
+            
+            // Smoothly move camera to target position
+            camera.position.lerp(targetPosition, cameraSmoothness);
+            
+            // Calculate look target
+            const lookTarget = raceGame.player.position.clone();
+            const rotatedLookOffset = cameraLookOffset.clone();
+            rotatedLookOffset.applyAxisAngle(new THREE.Vector3(0, 1, 0), targetRotation);
+            lookTarget.add(rotatedLookOffset);
+            
+            // Make camera look at target
+            camera.lookAt(lookTarget);
+        }
+    }
+    
+    renderer.render(scene, camera);
+}
+
+const clock = new THREE.Clock();
+animate();
+
+// Handle window resize
+window.addEventListener('resize', () => {
+    camera.aspect = window.innerWidth / window.innerHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(window.innerWidth, window.innerHeight);
 });
+
+// Remove or modify controls that might interfere with the racing game
+// const controls = new CameraControls(camera, renderer.domElement);
+// controls.update(delta);
+
+// Remove time control UI as it's not needed for racing
+const timeControlDiv = document.getElementById('time-control');
+if (timeControlDiv) {
+    timeControlDiv.style.display = 'none';
+}
+
+// Update controls div with racing controls
+const controlsDiv = document.getElementById('controls');
+if (controlsDiv) {
+    controlsDiv.innerHTML = `
+        <div>WASD or Arrow Keys - Drive</div>
+        <div>Space - Brake</div>
+        <div>Enter - Start/Restart Race</div>
+    `;
+}
 
 // Weather controls
 const weatherControlDiv = document.createElement('div');
@@ -130,13 +166,6 @@ weatherControlDiv.innerHTML = `
     <button id="weather-fog">Fog</button>
 `;
 document.body.appendChild(weatherControlDiv);
-
-// Handle window resize
-window.addEventListener('resize', () => {
-    camera.aspect = window.innerWidth / window.innerHeight;
-    camera.updateProjectionMatrix();
-    renderer.setSize(window.innerWidth, window.innerHeight);
-});
 
 // Add this debug function before your animate function
 function debugUniformCount() {
@@ -273,31 +302,8 @@ function debugUniformCount() {
     console.log('======= END DEBUG INFO =======');
 }
 
-// Animation loop
-function animate() {
-    requestAnimationFrame(animate);
-    
-    // Update stats if available
-    if (typeof stats !== 'undefined') {
-        stats.update();
-    }
-    
-    // Call debug function once
-    if (!window.debugRan) {
-        debugUniformCount();
-        window.debugRan = true;
-    }
-    
-    const delta = clock.getDelta();
-    controls.update(delta);
-    
-    // Update components
-    traffic.update(delta);
-    pedestrians.update(delta);
-    dayNightCycle.update(delta);
-    
-    renderer.render(scene, camera);
-}
-
-const clock = new THREE.Clock();
-animate(); 
+// Call debug function once
+if (!window.debugRan) {
+    debugUniformCount();
+    window.debugRan = true;
+} 
